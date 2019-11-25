@@ -1,63 +1,32 @@
-from pymongo import MongoClient
-import warnings
-from operator import itemgetter
 from datetime import datetime
+from operator import itemgetter
 import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
-import warnings
-warnings.filterwarnings("ignore")
 from sklearn import metrics
 import pandas as pd
+import sys
 
-#update this variable with a collection name
-eval_rr_model_op = "cortical_ranked_quality"
-mongoServer = "theorganon1.cisco.com"
-user =  "eval_rw"
-password = "Cisco123!"
-evalModelDB = "NLP_EVAL_MODEL_OP"
-evalUserDB = "NLP_EVAL_USER_DB"
-mongoUrl = "mongodb://{0}:{1}@{2}:27017/{3}?3t.uriVersion=2&3t.connectionMode=direct&3t.connection.name=NLP+Evaluation+Database%28OGS2%29&readPreference=primary&3t.databases={4},{3}"
-client = MongoClient(mongoUrl.format(user,password,mongoServer,evalModelDB,evalUserDB))
-eval_ir_model_op = "cortical_inferred_quality"
 csv_name = f"normalized_discounted_cumulative_gain_{datetime.now().strftime('%Y-%m-%d')}.csv"
+eval_rr_model_op = "./Model Output/ranked_relevance_quality_indicator.json"
+eval_ir_model_op = "./Model Output/set-based_relevance_quality_indicator.json"
+eval_rr_feedback = "./Feedback Datasets/ranked_relevance_quality_indicator.json"
+eval_ir_feedback = "./Feedback Datasets/set-based_relevance_quality_indicator.json"
 
+def getModelOutput():
+    with open(eval_rr_model_op, encoding='utf-8') as data_file:
+        data = json.loads(data_file.read())
+    rr_df = pd.DataFrame(data)
 
-def step4():
-    if eval_rr_model_op == "":
-        return("update the variable eval_ir_model_op with the collection name you copied from the upload tool")
+    with open(eval_ir_model_op, encoding='utf-8') as data_file:
+        data = json.loads(data_file.read())
 
-    else:
-        db = client[evalModelDB]
-        cursor = db[eval_rr_model_op].find({})
-        rr_df = pd.DataFrame(list(cursor))
-        rr_df.drop('_id', axis=1, inplace=True)
-        return(rr_df)
-
-def step8():
-    if eval_ir_model_op == "":
-        return("update the variable eval_ir_model_op with the collection name you copied from the upload tool")
-
-    else:
-        db = client[evalModelDB]
-        cursor = db[eval_ir_model_op].find({})
-        ir_df = pd.DataFrame(list(cursor))
-        ir_df.drop('_id', axis=1, inplace=True)
-        return(ir_df)
-
-def getClusterData():
-    client = MongoClient("mongodb://eval_admin:Mustafa!@theorganon1.cisco.com:27017/NLP_EVAL_IP?3t.databases=NLP_EVAL_IP&3t.uriVersion=2&3t.connectionMode=direct&3t.connection.name=NLP+Evaluation+Database%28OGS2%29&readPreference=primary")
-    db = client.NLP_EVAL_IP
-    return client, db, db.collection_names()
-
-def getClusterData1():
-    client = MongoClient("mongodb://eval_admin:Mustafa!@theorganon1.cisco.com:27017/NLP_EVAL_IP?3t.databases=NLP_EVAL_IP&3t.uriVersion=2&3t.connectionMode=direct&3t.connection.name=NLP+Evaluation+Database%28OGS2%29&readPreference=primary")
-    db = client.NLP_EVAL_RESULTS
-    return client, db, db.collection_names()
+    ir_df = pd.DataFrame(data)
+    return(rr_df, ir_df)
 
 def add_feedback(df1):
-    d = getClusterData()
-    df2 = pd.DataFrame(list(d[1]['ranked_relevance_quality_indicator'].find({})))
+    with open(eval_rr_feedback, encoding='utf-8') as data_file:
+        data = json.loads(data_file.read())
+
+    df2 = pd.DataFrame(data)
     df2.drop('_id', axis =1, inplace=True)
     df_final = pd.merge(df1, df2, how = 'inner', left_on=['query','result'], right_on=['query', 'result'])
     df_final = df_final.apply(lambda x: x.str.strip())
@@ -146,10 +115,9 @@ def final_eval_dataset(df_f):
         dic_ret['1_star'] = feedbacks[0]
         list_retina.append(dic_ret)
     df = pd.DataFrame(list_retina)
-    d1 = getClusterData1()
-    d1[1]['cortical_ranked_quality'].insert_many(list_retina)
     df.to_csv(csv_name, index=False)
     return df
+
 def csv_creation_and_analysis(df_input):
     df_int = add_feedback(df_input)
     df = final_eval_dataset(df_int)
@@ -232,15 +200,23 @@ def gen_report(rr_ndcg,rr_df_scatter,ir_df):
     print('Precision Recall Area Under Curve:', area)
 
 if __name__ == '__main__':
+
+    if len(sys.argv) == 5:
+        eval_rr_model_op = sys.argv[1]
+        eval_rr_feedback = sys.argv[2]
+        eval_ir_model_op = sys.argv[3]
+        eval_ir_feedback = sys.argv[4]
+    else:
+        print("Since no model output files were provided, this evaluation will run on the demo dataset")
+
     print("| Evaluation in Progress")
     print("|------------------------")
-    rr_df = step4()
-    print("| + Completed Step 4")
-    ir_df = step8()
-    print("| + Completed Step 8")
+    rr_df, ir_df = getModelOutput()
+    print("| + Loaded model output for evaluation")
+    print("| + Evaluating IR...")
     rr_ndcg, rr_df_int, rr_df_scatter = csv_creation_and_analysis(rr_df)
     ir_df = precision_recall_fpr(ir_df)
-    print("| + Completed Step 9")
+    print("| + Completed evaluation")
     print("|------------------------")
     print("Report Card:")
     gen_report(rr_ndcg, rr_df_scatter, ir_df)
