@@ -210,8 +210,13 @@ if __name__ == '__main__':
         eval_rr_feedback = sys.argv[2]
         eval_ir_model_op = sys.argv[3]
         eval_ir_feedback = sys.argv[4]
+    elif len(sys.argv) == 3:
+        print(
+            "| Notice! Since insufficient model output files were provided, this evaluation will use the demo feedback dataset")
+        eval_rr_model_op = sys.argv[1]
+        eval_ir_model_op = sys.argv[2]
     else:
-        print("| Warning! Since insufficient model output files were provided, this evaluation will run on the demo dataset")
+        print("| Notice! Since insufficient model output files were provided, this evaluation will run on the demo dataset")
 
     print("| Evaluation in Progress")
     print("|------------------------------------------------------------------------")
