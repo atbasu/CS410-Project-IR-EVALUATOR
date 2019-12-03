@@ -211,7 +211,7 @@ The result of the analysis will be generated on the terminal prompt and two csv 
 | Set-based Relevance Quality Analysis : ./set-based_relevance_quality_analysis_2019-12-03.csv
 |------------------------------------------------------------------------
 ```
-To understand how these csv files can be converted into dataframes and used for further analysis of the performance of the IR system, run the python notebook "IR_EVALUATOR.py":
+To understand how these csv files can be converted into dataframes and used for further analysis of the performance of the IR system, run the python notebook "[IR_EVALUATOR.py](https://github.com/atbasu/CS410-Project-IR-EVALUATOR/blob/master/IR%20Evaluator.ipynb)":
 
 > (base) ATBASU-M-45BA:Project atbasu$ jupyter notebook
 
