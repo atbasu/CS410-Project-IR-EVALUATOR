@@ -4,8 +4,13 @@ import numpy as np
 from sklearn import metrics
 import pandas as pd
 import sys
+import json
+import warnings
 
-csv_name = f"normalized_discounted_cumulative_gain_{datetime.now().strftime('%Y-%m-%d')}.csv"
+warnings.filterwarnings("ignore")
+
+rr_df_csv = f"ranked_relevance_quality_analysis_{datetime.now().strftime('%Y-%m-%d')}.csv"
+ir_df_csv = f"set-based_relevance_quality_analysis_{datetime.now().strftime('%Y-%m-%d')}.csv"
 eval_rr_model_op = "./Model Output/ranked_relevance_quality_indicator.json"
 eval_ir_model_op = "./Model Output/set-based_relevance_quality_indicator.json"
 eval_rr_feedback = "./Feedback Datasets/ranked_relevance_quality_indicator.json"
@@ -27,7 +32,6 @@ def add_feedback(df1):
         data = json.loads(data_file.read())
 
     df2 = pd.DataFrame(data)
-    df2.drop('_id', axis =1, inplace=True)
     df_final = pd.merge(df1, df2, how = 'inner', left_on=['query','result'], right_on=['query', 'result'])
     df_final = df_final.apply(lambda x: x.str.strip())
     df_final.score = df_final.score.apply(lambda x : float(x.replace("'","")))
@@ -115,7 +119,7 @@ def final_eval_dataset(df_f):
         dic_ret['1_star'] = feedbacks[0]
         list_retina.append(dic_ret)
     df = pd.DataFrame(list_retina)
-    df.to_csv(csv_name, index=False)
+    df.to_csv(rr_df_csv, index=False)
     return df
 
 def csv_creation_and_analysis(df_input):
@@ -139,9 +143,10 @@ def csv_creation_and_analysis(df_input):
 
 #add code to generate Inferred Relevance Quality Indictor data
 def fetch_inferred_pivot_dataset():
-    d = getClusterData()
-    ir_mn = pd.DataFrame(list(d[1]['inferred_result_quality_indicator'].find({})))
-    ir_mn.drop('_id', axis =1, inplace=True)
+    with open(eval_ir_feedback, encoding='utf-8') as data_file:
+        data = json.loads(data_file.read())
+
+    ir_mn = pd.DataFrame(data)
     return ir_mn
 
 ### Add the inferred relevance quality indicator code
@@ -179,25 +184,24 @@ def precision_recall_fpr(ir_df):
     ir_df['precision'] = ir_df['query'].map(dict_pre)
     ir_df['recall'] = ir_df['query'].map(dict_recall)
     ir_df['f_score'] = ir_df['query'].map(dict_fscore)
-    ir_df.to_csv(f"final_precision_recall_results_{datetime.now().strftime('%Y-%m-%d')}.csv", index=False)
     return ir_df
 
 def gen_report(rr_ndcg,rr_df_scatter,ir_df):
     #Ranked Relevance Quality Indicator
-    print ('Average Normalized Decreased Cumulative Gain: ', round(np.mean(rr_ndcg), 3))
+    print ('| * Average Normalized Decreased Cumulative Gain: ', round(np.mean(rr_ndcg), 3))
 
     #Semantic Relevance Quality Indicator
-    print ('Cross_Entropy_Loss_Function Score(average): ', round(np.mean(rr_df_scatter.cross_entropy_loss), 3))
-    print ('Relevance Quality Indicator (percentage): ',
+    print ('| * Cross_Entropy_Loss_Function Score(average): ', round(np.mean(rr_df_scatter.cross_entropy_loss), 3))
+    print ('| * Relevance Quality Indicator (percentage): ',
            round(rr_df_scatter[rr_df_scatter.validation == True].__len__() / len(rr_df_scatter) * 100, 2))
-    print ('Relevance Quality Indicator (average): ', round(np.mean(rr_df_scatter.delta), 3))
+    print ('| * Relevance Quality Indicator (average): ', round(np.mean(rr_df_scatter.delta), 3))
 
     #Inferred Relevance Quality Indicator
-    print ('Average Precision Score: ', round(np.mean(ir_df.precision), 3))
-    print ('Average Recall Score: ', round(np.mean(ir_df.recall), 3))
-    print ('Average F Score: ', round(np.mean(ir_df.f_score), 3))
+    print ('| * Average Precision Score: ', round(np.mean(ir_df.precision), 3))
+    print ('| * Average Recall Score: ', round(np.mean(ir_df.recall), 3))
+    print ('| * Average F Score: ', round(np.mean(ir_df.f_score), 3))
     area = metrics.auc(sorted(ir_df.recall, reverse=True), sorted(ir_df.precision, reverse=True))
-    print('Precision Recall Area Under Curve:', area)
+    print('| * Precision Recall Area Under Curve:', area)
 
 if __name__ == '__main__':
 
@@ -207,16 +211,20 @@ if __name__ == '__main__':
         eval_ir_model_op = sys.argv[3]
         eval_ir_feedback = sys.argv[4]
     else:
-        print("Since no model output files were provided, this evaluation will run on the demo dataset")
+        print("| Warning! Since insufficient model output files were provided, this evaluation will run on the demo dataset")
 
     print("| Evaluation in Progress")
-    print("|------------------------")
+    print("|------------------------------------------------------------------------")
     rr_df, ir_df = getModelOutput()
     print("| + Loaded model output for evaluation")
     print("| + Evaluating IR...")
     rr_ndcg, rr_df_int, rr_df_scatter = csv_creation_and_analysis(rr_df)
     ir_df = precision_recall_fpr(ir_df)
+    ir_df.to_csv(ir_df_csv, index=False)
     print("| + Completed evaluation")
-    print("|------------------------")
-    print("Report Card:")
+    print("|------------------------------------------------------------------------")
+    print("| Report Card:")
+    print("|------------------------------------------------------------------------")
     gen_report(rr_ndcg, rr_df_scatter, ir_df)
+    print("|------------------------------------------------------------------------")
+    print("| Saving dataframes to file\n| Ranked Relevance Quality Analysis : ./" + rr_df_csv + "\n| Set-based Relevance Quality Analysis : ./" + ir_df_csv + "\n|------------------------------------------------------------------------")
